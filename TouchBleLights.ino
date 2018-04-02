@@ -1,3 +1,5 @@
+#include <Adafruit_MPR121.h>
+
 /*********************************************************************
 /*********************************************************
 Author: John B Damask & Adafruit folks (via their demos)
@@ -12,7 +14,6 @@ Todo: Create classes for ble, touch and pixel functions.
 
 *********************************************************************/
 #include <Wire.h>
-#include "Adafruit_MPR121.h"
 
 #include <string.h>
 #include <Arduino.h>
@@ -59,8 +60,8 @@ Todo: Create classes for ble, touch and pixel functions.
     NUMPIXELS                 How many NeoPixels are attached to the Arduino?
     -----------------------------------------------------------------------*/
     #define FACTORYRESET_ENABLE     1
-    #define PIN                     9
-    #define NUMPIXELS               24
+    #define PIN                     6
+    #define NUMPIXELS               120
     #define BRIGHTNESS              30
     #define MIN                     1
     #define MAX                     255
@@ -69,8 +70,9 @@ Todo: Create classes for ble, touch and pixel functions.
 
 uint8_t output = 0;
 uint8_t len = 0;
-//Adafruit_NeoPixel pixel = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRBW + NEO_KHZ800);
-Adafruit_NeoPixel pixel = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+bool neoPixelsWhite = true; // Set to true if using GRBW neopixels (this code ignores white...but it will need to be passed if using GRBW)
+Adafruit_NeoPixel pixel;
+
 // You can have up to 4 on one i2c bus but one is enough for testing!
 Adafruit_MPR121 cap = Adafruit_MPR121();
 // Keeps track of the last pins touched
@@ -80,25 +82,8 @@ uint16_t currtouched = 0;
 uint8_t state = 0;
 bool printOnceBle = false;
 
-// Create the bluefruit object, either software serial...uncomment these lines
-/*
-SoftwareSerial bluefruitSS = SoftwareSerial(BLUEFRUIT_SWUART_TXD_PIN, BLUEFRUIT_SWUART_RXD_PIN);
-
-Adafruit_BluefruitLE_UART ble(bluefruitSS, BLUEFRUIT_UART_MODE_PIN,
-                      BLUEFRUIT_UART_CTS_PIN, BLUEFRUIT_UART_RTS_PIN);
-*/
-
-/* ...or hardware serial, which does not need the RTS/CTS pins. Uncomment this line */
-// Adafruit_BluefruitLE_UART ble(BLUEFRUIT_HWSERIAL_NAME, BLUEFRUIT_UART_MODE_PIN);
-
 /* ...hardware SPI, using SCK/MOSI/MISO hardware SPI pins and then user selected CS/IRQ/RST */
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
-
-/* ...software SPI, using SCK/MOSI/MISO user-defined SPI pins and then user selected CS/IRQ/RST */
-//Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_SCK, BLUEFRUIT_SPI_MISO,
-//                             BLUEFRUIT_SPI_MOSI, BLUEFRUIT_SPI_CS,
-//                             BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
-
 
 // A small helper
 void error(const __FlashStringHelper*err) {
@@ -114,7 +99,8 @@ void printHex(const uint8_t * data, const uint32_t numBytes);
 // the packet buffer
 extern uint8_t packetbuffer[];
 // the defined length of a color payload
-int colorLength = 6;
+//int colorLength = 6; // From days of sending RGB colors
+int colorLength = 4;
 uint8_t PAYLOAD_START = "!";
 uint8_t COLOR_CODE = "C";
 uint8_t BUTTON_CODE = "B";
@@ -125,24 +111,16 @@ uint8_t blue;
 // the ble payload, set to max buffer size
 uint8_t payload[21];
 
-/*uint8_t crc(int len) {
-  char checksum = 0; // could be an int if preferred      
-  for(uint8_t x=0; x<len-1; x++)
-  {
-      checksum += payload[x];
-  }
-  checksum = ~checksum;
-  Serial.print("Checksum: ");
-  Serial.println(checksum, HEX);
-  return checksum;
-}*/
-
 void setColors(uint8_t r, uint8_t g, uint8_t b){
   red = r; green = g; blue = b;
 }
 
 void wipe(){
-  colorWipe(pixel.Color(red, green, blue),10);
+  if(neoPixelsWhite){
+    colorWipe(pixel.Color(red, green, blue, 0),10);
+  } else {
+    colorWipe(pixel.Color(red, green, blue),10);
+  }
 }
 
 
@@ -156,8 +134,12 @@ void setup()
 {
   delay(1000);
   Serial.println("Setting up");
-//  while (!Serial);  // required for Flora & Micro
-  
+
+  if (neoPixelsWhite) {
+    pixel = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRBW + NEO_KHZ800);  
+  }else{
+    pixel = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800); 
+  }
 
   // turn off neopixel
   pixel.begin(); // This initializes the NeoPixel library.
@@ -273,43 +255,12 @@ void loop(void)
   delay(10);
 }
 
-// Lights triggered by bluetooth
-void bl(){
-  
-  /* Got a packet! */
-   printHex(packetbuffer, len);
+void setLights(){
 
-  // Color
-  if (packetbuffer[1] == 'C') {
-    red = packetbuffer[2];
-    green = packetbuffer[3];
-    blue = packetbuffer[4];
-    colorWipe(pixel.Color(red,green,blue), 10);  
-  }
-}
-
-// Lights triggered by touch pads
-void touch(){
-   for (uint8_t i=0; i<NUMTOUCH; i++) {
-    // it if *is* touched and *wasnt* touched before, alert!
-    if ((currtouched & _BV(i)) && !(lasttouched & _BV(i)) ) {
-      Serial.print(i); Serial.println(" touched");
-      state = i;
-    }
-        // if it *was* touched and now *isnt*, alert!
-    if (!(currtouched & _BV(i)) && (lasttouched & _BV(i)) ) {
-      Serial.print(i); Serial.println(" released");
-    }
-  //  pixel.show();
-  }
-  Serial.print("Button selected: ");
-  Serial.println(state);
-  // reset our state
-  lasttouched = currtouched;
-  //if(animation==true) {   
     switch (state){
       case 0:
-        setColors(255, 49, 236);
+        setColors(113, 40, 180);
+        
         wipe();
         break;        
       case 1:
@@ -322,11 +273,10 @@ void touch(){
         break;
       case 3:
         setColors(0, 255, 0);
-        wipe();
-//        rainbow(10);          
+        wipe();      
         break;
-      case 4: //OFF
-        setColors(0, 0, 0);
+      case 4: 
+        setColors(255, 49, 236);
         wipe();
         break;
       case 5: 
@@ -352,20 +302,62 @@ void touch(){
       case 10:   
         setColors(50, 50, 50);
         wipe();
-//        theaterChaseRainbow(10);
         break;
-      case 11:   
-        setColors(200, 200, 200);
-        wipe();
- //       rainbow(10);
+      case 11:   // OFF
+        setColors(0, 0, 0);
         break;
       default:
        colorWipe(pixel.Color(0,0,0),10);
        break;  
     }
 
-    payload[0] = 0x21;
-    Serial.println(payload[0], HEX);
+}
+
+// Lights triggered by bluetooth
+void bl(){
+  /* Got a packet! */
+  printHex(packetbuffer, len);
+  state = packetbuffer[2];
+
+  setLights();
+  
+/*  // Color
+  if (packetbuffer[1] == 'C') {
+    red = packetbuffer[2];
+    green = packetbuffer[3];
+    blue = packetbuffer[4];
+    colorWipe(pixel.Color(red,green,blue), 10);  
+  }*/
+}
+
+// Lights triggered by touch pads
+void touch(){
+   for (uint8_t i=0; i<NUMTOUCH; i++) {
+    // it if *is* touched and *wasnt* touched before, alert!
+    if ((currtouched & _BV(i)) && !(lasttouched & _BV(i)) ) {
+      Serial.print(i); Serial.println(" touched");
+      state = i;
+    }
+        // if it *was* touched and now *isnt*, alert!
+    if (!(currtouched & _BV(i)) && (lasttouched & _BV(i)) ) {
+      Serial.print(i); Serial.println(" released");
+    }
+  //  pixel.show();
+  }
+  Serial.print("Button selected: ");
+  Serial.println(state);
+  // reset our state
+  lasttouched = currtouched;
+  setLights();
+
+  // Now package into a packetbuffer and write to Bluetooth
+  payload[0] = 0x21;
+  Serial.println(payload[0], HEX);
+  payload[1] = 0x42;
+  payload[2] = state;
+  //payload[2] = 0x32;
+
+/* From days of sending color codes instead of states
     payload[1] = 0x43;
     Serial.println(payload[1], HEX);
     payload[2] = red;
@@ -374,38 +366,20 @@ void touch(){
     Serial.println(payload[3], HEX);
     payload[4] = blue;
     Serial.println(payload[4], HEX);
-
+*/
 
   uint8_t xsum = 0;
-  uint16_t colLen = 5;
+//  uint16_t colLen = 5;
+  uint16_t colLen = 3;
   for (uint8_t i=0; i<colLen; i++) {
     xsum += payload[i];
   }
   xsum = ~xsum;
-  
-   // uint8_t checksum = 0; // could be an int if preferred      
-//    for(uint8_t x=0; x<5; x++)
-//    {
-//      checksum += payload[x];
-//    }
-//    checksum = ~checksum;
-//    Serial.print("Checksum: ");
-//    Serial.println(checksum, HEX);
-    //payload[5] = crc(colorLength);
     
-    payload[5] = xsum;
-    
-//    Serial.println(payload[5], HEX);
-//    Serial.print("Payload: ");
-//    Serial.println(sizeof(payload)/sizeof(uint8_t) ); 
-
-//     Serial.println( F("Switching to COMMAND mode!") );
-    ble.write(payload,colorLength);
-
-    ble.readline(200);
-
- //   Serial.println( F("Switching to DATA mode!") );
- //   ble.setMode(BLUEFRUIT_MODE_DATA);    
+//  payload[5] = xsum;
+  payload[3] = xsum;
+  ble.write(payload,colorLength);
+  ble.readline(200);
 }
 
 
