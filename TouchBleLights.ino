@@ -252,62 +252,61 @@ void loop(void)
   return;
  }
 
-  delay(10);
+  delay(5);
 }
 
 void setLights(){
 
     switch (state){
       case 0:
-        setColors(113, 40, 180);
-        
+        setColors(255, 192, 203); // Pink        
         wipe();
         break;        
       case 1:
-        setColors(113, 40, 180);
+        setColors(0, 128, 128); // Blue green
         wipe();
         break;      
       case 2:
-        setColors(255, 0, 0);
+        setColors(255, 0, 0);  // Red
         wipe();
         break;
       case 3:
-        setColors(0, 255, 0);
+        setColors(0, 255, 0);  // Green
         wipe();      
         break;
       case 4: 
-        setColors(255, 49, 236);
+        setColors(0, 255, 255); // Cyan
         wipe();
         break;
       case 5: 
-        setColors(53, 34, 120);
+        setColors(0, 0, 255); // Blue
         wipe();
         break;
       case 6:
-        setColors(255, 0, 255);
+        setColors(255, 165, 0); // Orange
         wipe();
         break;
       case 7:
-        setColors(255, 255, 0);
+        setColors(128, 0, 128); // Purple
         wipe();
         break;
       case 8:
-        setColors(0, 255, 255);
+        setColors(255, 255, 0); // Yellow
         wipe();
         break;
       case 9:
-        setColors(76, 0, 48);
+        setColors(192, 214, 228); // Grey / blue
         wipe();
         break;
       case 10:   
-        setColors(50, 50, 50);
-        wipe();
+        rainbow(5);
         break;
       case 11:   // OFF
         setColors(0, 0, 0);
         break;
       default:
-       colorWipe(pixel.Color(0,0,0),10);
+        setColors(0, 0, 0);
+//       colorWipe(pixel.Color(0,0,0),5);
        break;  
     }
 
@@ -318,7 +317,6 @@ void bl(){
   /* Got a packet! */
   printHex(packetbuffer, len);
   state = packetbuffer[2];
-
   setLights();
   
 /*  // Color
@@ -335,24 +333,23 @@ void touch(){
    for (uint8_t i=0; i<NUMTOUCH; i++) {
     // it if *is* touched and *wasnt* touched before, alert!
     if ((currtouched & _BV(i)) && !(lasttouched & _BV(i)) ) {
-      Serial.print(i); Serial.println(" touched");
+ //     Serial.print(i); Serial.println(" touched");
       state = i;
     }
         // if it *was* touched and now *isnt*, alert!
     if (!(currtouched & _BV(i)) && (lasttouched & _BV(i)) ) {
-      Serial.print(i); Serial.println(" released");
+//      Serial.print(i); Serial.println(" released");
     }
-  //  pixel.show();
   }
-  Serial.print("Button selected: ");
-  Serial.println(state);
+ // Serial.print("Button selected: ");
+  //Serial.println(state);
   // reset our state
   lasttouched = currtouched;
   setLights();
 
   // Now package into a packetbuffer and write to Bluetooth
   payload[0] = 0x21;
-  Serial.println(payload[0], HEX);
+//  Serial.println(payload[0], HEX);
   payload[1] = 0x42;
   payload[2] = state;
   //payload[2] = 0x32;
