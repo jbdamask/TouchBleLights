@@ -117,7 +117,8 @@ void setColors(uint8_t r, uint8_t g, uint8_t b){
 
 void wipe(){
   if(neoPixelsWhite){
-    colorWipe(pixel.Color(red, green, blue, 0),10);
+    // My GRBW have twice the density of pixels and my GRB so they wipe faster
+    colorWipe(pixel.Color(red, green, blue, 0),5);
   } else {
     colorWipe(pixel.Color(red, green, blue),10);
   }
@@ -230,8 +231,8 @@ void loop(void)
       printOnceBle = true;
     }
     bleSetupOnConnect();
-  // Check bluetooth input
-  len = readPacket(&ble, BLE_READPACKET_TIMEOUT);
+    // Check bluetooth input
+    len = readPacket(&ble, BLE_READPACKET_TIMEOUT);
   }
 
   // Check touch pads input
@@ -303,9 +304,11 @@ void setLights(){
         break;
       case 11:   // OFF
         setColors(0, 0, 0);
+        wipe();
         break;
       default:
         setColors(0, 0, 0);
+        wipe();
 //       colorWipe(pixel.Color(0,0,0),5);
        break;  
     }
@@ -315,17 +318,9 @@ void setLights(){
 // Lights triggered by bluetooth
 void bl(){
   /* Got a packet! */
-  printHex(packetbuffer, len);
+//  printHex(packetbuffer, len);
   state = packetbuffer[2];
   setLights();
-  
-/*  // Color
-  if (packetbuffer[1] == 'C') {
-    red = packetbuffer[2];
-    green = packetbuffer[3];
-    blue = packetbuffer[4];
-    colorWipe(pixel.Color(red,green,blue), 10);  
-  }*/
 }
 
 // Lights triggered by touch pads
@@ -337,46 +332,34 @@ void touch(){
       state = i;
     }
         // if it *was* touched and now *isnt*, alert!
-    if (!(currtouched & _BV(i)) && (lasttouched & _BV(i)) ) {
-//      Serial.print(i); Serial.println(" released");
-    }
+//    if (!(currtouched & _BV(i)) && (lasttouched & _BV(i)) ) {
+////      Serial.print(i); Serial.println(" released");
+//    }
   }
+ 
  // Serial.print("Button selected: ");
   //Serial.println(state);
   // reset our state
   lasttouched = currtouched;
-  setLights();
-
   // Now package into a packetbuffer and write to Bluetooth
   payload[0] = 0x21;
-//  Serial.println(payload[0], HEX);
   payload[1] = 0x42;
   payload[2] = state;
-  //payload[2] = 0x32;
-
-/* From days of sending color codes instead of states
-    payload[1] = 0x43;
-    Serial.println(payload[1], HEX);
-    payload[2] = red;
-    Serial.println(payload[2], HEX);
-    payload[3] = green;
-    Serial.println(payload[3], HEX);
-    payload[4] = blue;
-    Serial.println(payload[4], HEX);
-*/
 
   uint8_t xsum = 0;
-//  uint16_t colLen = 5;
   uint16_t colLen = 3;
   for (uint8_t i=0; i<colLen; i++) {
     xsum += payload[i];
   }
-  xsum = ~xsum;
-    
-//  payload[5] = xsum;
+  xsum = ~xsum;    
   payload[3] = xsum;
+
+  /* Broadcast new state (useful if other devices are listening) */
   ble.write(payload,colorLength);
-  ble.readline(200);
+  //ble.readline(200);
+
+  /* Now set locally-attached lights */
+  setLights(); 
 }
 
 
