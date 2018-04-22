@@ -66,11 +66,20 @@ Todo: Create classes for ble, touch and pixel functions.
     #define MIN                     1
     #define MAX                     255
     #define NUMTOUCH                12
+    #define DEVICE_NAME             "AT+GAPDEVNAME=TouchLightsBle"
 /*=========================================================================*/
 
+
+/* ==========================================================================
+ *  NEOPIXEL colors
+ *  
+ *  Set to true if using GRBW neopixels 
+ *  (this code ignores white...but it will need to be passed if using GRBW)
+ ---------------------------------------*/
+bool neoPixelsWhite = true;  
+/*==========================================================================*/
 uint8_t output = 0;
 uint8_t len = 0;
-bool neoPixelsWhite = true; // Set to true if using GRBW neopixels (this code ignores white...but it will need to be passed if using GRBW)
 Adafruit_NeoPixel pixel;
 
 // You can have up to 4 on one i2c bus but one is enough for testing!
@@ -170,6 +179,9 @@ void setup()
       error(F("Couldn't factory reset"));
     }
   }
+
+  // Customize name
+  ble.println(DEVICE_NAME);
 
   /* Disable command echo from Bluefruit */
   ble.echo(false);
